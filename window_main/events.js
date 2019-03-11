@@ -171,9 +171,9 @@ function createEventRow(course) {
   if (matchesList) {
     var matches = matchesList
       .map(index => matchesHistory[index])
-      .filter(match => match !== undefined && match.type === "match")
+      .filter(match => match !== undefined && match.type === "match");
 
-    var duration = matches.reduce((acc, match) => acc + match.duration , 0);
+    var duration = matches.reduce((acc, match) => acc + match.duration, 0);
   }
 
   flexCenterBottom.appendChild(
@@ -305,7 +305,8 @@ function createMatchRow(match) {
   );
 
   var or = createDivision(["ranks_16"]);
-  or.style.backgroundPosition = `${get_rank_index_16(match.opponent.rank) * -16}px 0px`;
+  or.style.backgroundPosition = `${get_rank_index_16(match.opponent.rank) *
+    -16}px 0px`;
   or.title = match.opponent.rank + " " + match.opponent.tier;
   flexCenterTop.appendChild(or);
 

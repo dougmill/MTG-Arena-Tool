@@ -234,22 +234,26 @@ ipc.on("set_db", function(event, arg) {
 });
 
 //
-ipc.on('set_player_data', (event, _data) => {
-	playerData = _data;
+ipc.on("set_player_data", (event, _data) => {
+  playerData = _data;
 
-	if (sidebarActive != -99) {
-		$('.top_username').html(playerData.name.slice(0, -6));
-		$('.top_username_id').html(playerData.name.slice(-6));
+  if (sidebarActive != -99) {
+    $(".top_username").html(playerData.name.slice(0, -6));
+    $(".top_username_id").html(playerData.name.slice(-6));
 
-		let rankOffset;
-		let constructed = playerData.rank.constructed;
-		rankOffset = get_rank_index(constructed.rank, constructed.tier);
-		$(".top_constructed_rank").css("background-position", (rankOffset*-48)+"px 0px").attr("title", constructed.rank+' '+constructed.tier);
+    let rankOffset;
+    let constructed = playerData.rank.constructed;
+    rankOffset = get_rank_index(constructed.rank, constructed.tier);
+    $(".top_constructed_rank")
+      .css("background-position", rankOffset * -48 + "px 0px")
+      .attr("title", constructed.rank + " " + constructed.tier);
 
-		let limited = playerData.rank.limited;
-		rankOffset = get_rank_index(limited.rank, limited.tier);
-		$(".top_limited_rank").css("background-position", (rankOffset*-48)+"px 0px").attr("title", limited.rank+' '+limited.tier);
-	}
+    let limited = playerData.rank.limited;
+    rankOffset = get_rank_index(limited.rank, limited.tier);
+    $(".top_limited_rank")
+      .css("background-position", rankOffset * -48 + "px 0px")
+      .attr("title", limited.rank + " " + limited.tier);
+  }
 });
 
 //
@@ -572,16 +576,16 @@ function rememberMe() {
 }
 
 //
-ipc.on('initialize', function () {
-	$('.top_username').html(playerData.name.slice(0, -6));
-	$('.top_username_id').html(playerData.name.slice(-6));
+ipc.on("initialize", function() {
+  $(".top_username").html(playerData.name.slice(0, -6));
+  $(".top_username_id").html(playerData.name.slice(-6));
 
-	sidebarActive = -1;
-	ipc_send('request_home', true);
-	$('.top_nav').removeClass('hidden');
-	$('.overflow_ux').removeClass('hidden');
-	$('.message_center').css('display', 'none');
-	$('.init_loading').hide();
+  sidebarActive = -1;
+  ipc_send("request_home", true);
+  $(".top_nav").removeClass("hidden");
+  $(".overflow_ux").removeClass("hidden");
+  $(".message_center").css("display", "none");
+  $(".init_loading").hide();
 });
 
 //
@@ -1972,7 +1976,11 @@ function open_settings(openSection) {
 
   var sliderSoundVolume = $('<div class="slidecontainer_settings"></div>');
   sliderSoundVolume.appendTo(section);
-  var sliderSoundVolumeLabel = $(`<label style="width: 400px;">Volume: ${Math.round(settings.sound_priority_volume*100)}%</label>`);
+  var sliderSoundVolumeLabel = $(
+    `<label style="width: 400px;">Volume: ${Math.round(
+      settings.sound_priority_volume * 100
+    )}%</label>`
+  );
   sliderSoundVolumeLabel.appendTo(sliderSoundVolume);
   var sliderSoundVolumeInput = $(
     '<input type="range" min="0" max="1" step=".001" value="' +
@@ -2438,7 +2446,9 @@ function open_settings(openSection) {
   $(".sliderSoundVolume").off();
 
   $(".sliderSoundVolume").on("click mouseup", function() {
-    sliderSoundVolumeLabel.html(`Volume: ${Math.round(settings.sound_priority_volume*100)}%`);
+    sliderSoundVolumeLabel.html(
+      `Volume: ${Math.round(settings.sound_priority_volume * 100)}%`
+    );
     let { Howl, Howler } = require("howler");
     let sound = new Howl({ src: ["../sounds/blip.mp3"] });
     updateSettings();

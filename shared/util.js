@@ -905,22 +905,22 @@ function addCardHover(div, _card) {
     $(".main_hover").on("load", function() {
       $(".loader").css("opacity", 0);
       if (renderer == 0) {
-        let hoverCardQuantity = $('.hover_card_quantity');
+        let hoverCardQuantity = $(".hover_card_quantity");
         hoverCardQuantity.html("");
         hoverCardQuantity.css("opacity", 1);
         for (let i = 0; i < 4; i++) {
           if (cardsNew[_card.id] != undefined && i < cardsNew[_card.id]) {
-            $(
-              '<div class="inventory_card_quantity_orange"></div>'
-            ).appendTo(hoverCardQuantity);
+            $('<div class="inventory_card_quantity_orange"></div>').appendTo(
+              hoverCardQuantity
+            );
           } else if (i < cards[_card.id]) {
-            $(
-              '<div class="inventory_card_quantity_green"></div>'
-            ).appendTo(hoverCardQuantity);
+            $('<div class="inventory_card_quantity_green"></div>').appendTo(
+              hoverCardQuantity
+            );
           } else {
-            $(
-              '<div class="inventory_card_quantity_gray"></div>'
-            ).appendTo(hoverCardQuantity);
+            $('<div class="inventory_card_quantity_gray"></div>').appendTo(
+              hoverCardQuantity
+            );
           }
         }
       }
@@ -928,7 +928,7 @@ function addCardHover(div, _card) {
   });
 
   div.addEventListener("mouseleave", () => {
-    $('.hover_card_quantity').css("opacity", 0);
+    $(".hover_card_quantity").css("opacity", 0);
     $(".main_hover").css("opacity", 0);
     $(".main_hover_dfc").css("opacity", 0);
     $(".loader").css("opacity", 0);

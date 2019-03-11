@@ -1,211 +1,211 @@
 body {
-    pointer-events: none;
+  pointer-events: none;
 }
 
 .click-on {
-    pointer-events: all;
+  pointer-events: all;
 }
 .click-through {
-    pointer-events: none;
+  pointer-events: none;
 }
 
 .overlay_container {
-    -webkit-transition: all 0.2s ease-in;
+  -webkit-transition: all 0.2s ease-in;
 }
 
 .overlay_decklist {
-    padding-left: 2px;
-    overflow-x: hidden;
-    overflow-y: auto;
-    flex-grow: 2;
+  padding-left: 2px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  flex-grow: 2;
 }
 
 .overlay_decklist a {
-    color: inherit;
-    text-decoration: none;
+  color: inherit;
+  text-decoration: none;
 }
 
 .overlay_deckname {
-    -webkit-app-region: drag;
-    padding: 12px 0 0 0;
-    text-align: center;
-    color: #fae5d2;
+  -webkit-app-region: drag;
+  padding: 12px 0 0 0;
+  text-align: center;
+  color: #fae5d2;
 }
 
 .overlay_archetype {
-    font-size: 14px;
-    opacity: 1;
-    -webkit-app-region: drag;
-    padding: 4px 0 0 0;
-    text-align: center;
-    color: #fae5d2;
+  font-size: 14px;
+  opacity: 1;
+  -webkit-app-region: drag;
+  padding: 4px 0 0 0;
+  text-align: center;
+  color: #fae5d2;
 }
 
 .overlay_deckcolors {
-    -webkit-app-region: drag;
-    height: 24px;
-    display: flex;
-    justify-content: center;
-    margin-top: 4px;
+  -webkit-app-region: drag;
+  height: 24px;
+  display: flex;
+  justify-content: center;
+  margin-top: 4px;
 }
 
 .overlay_separator {
-    padding: 4px;
-    height: 16px;
-    background: url(../images/separator_spr.png) center no-repeat;
+  padding: 4px;
+  height: 16px;
+  background: url(../images/separator_spr.png) center no-repeat;
 }
 
 .main_hover {
-    margin-left: auto !important;
-    margin-right: auto !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
 }
 
 .overlay_hover {
-    pointer-events: none;
-    width: 90%;
-    max-width: 300px;
-    opacity: 0;
-    display: block;
-    margin-left: auto;
-    margin-right: auto;
-    -webkit-border-radius: 4.75% / 3.5%;
-    box-shadow: 0px 15px 30px 0px rgba(0, 0, 0, 0.5);
-    -webkit-transition: opacity 0.2s ease-in;
+  pointer-events: none;
+  width: 90%;
+  max-width: 300px;
+  opacity: 0;
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+  -webkit-border-radius: 4.75% / 3.5%;
+  box-shadow: 0px 15px 30px 0px rgba(0, 0, 0, 0.5);
+  -webkit-transition: opacity 0.2s ease-in;
 }
 
 .overlay_hover_container {
-    pointer-events: none;
-    position: absolute;
-    bottom: 0;
-    float: right;
-    width: 100%;
-    z-index: 50;
+  pointer-events: none;
+  position: absolute;
+  bottom: 0;
+  float: right;
+  width: 100%;
+  z-index: 50;
 }
 
 .overlay_clock_container {
-    -webkit-app-region: drag;
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    bottom: 0;
-    width: 100%;
-    min-height: 64px;
-    height: 64px;
-    z-index: 40;
-    background-color: rgba(0, 0, 0, 0.5);
+  -webkit-app-region: drag;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  bottom: 0;
+  width: 100%;
+  min-height: 64px;
+  height: 64px;
+  z-index: 40;
+  background-color: rgba(0, 0, 0, 0.5);
 }
 
 .overlay_draft_container {
-    position: absolute;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-around;
-    bottom: 0;
-    width: 100%;
-    height: 64px;
-    min-height: 64px;
-    top: 64px;
-    z-index: 40;
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  bottom: 0;
+  width: 100%;
+  height: 64px;
+  min-height: 64px;
+  top: 64px;
+  z-index: 40;
 }
 
 .overlay_deck_container {
-    pointer-events: none;
-    position: absolute;
-    flex-direction: column;
-    display: flex;
-    justify-content: space-between;
-    bottom: 0;
-    width: 100%;
-    height: 64px;
-    top: 64px;
-    z-index: 40;
+  pointer-events: none;
+  position: absolute;
+  flex-direction: column;
+  display: flex;
+  justify-content: space-between;
+  bottom: 0;
+  width: 100%;
+  height: 64px;
+  top: 64px;
+  z-index: 40;
 }
 
 .chance_title {
-    font-size: 14px;
-    height: 20px;
-    line-height: 20px;
-    margin: 0px auto;
-    text-align: center;
-    color: rgba(255, 255, 255, 0.85);
+  font-size: 14px;
+  height: 20px;
+  line-height: 20px;
+  margin: 0px auto;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.85);
 }
 
 .clock_elapsed {
-    justify-content: center;
-    display: flex;
-    margin-left: 32px;
-    width: calc(100% - 64px);
-    height: 48px;
-    text-align: center;
-    line-height: 48px;
-    font-size: 25px;
-    color: rgba(255, 255, 255, 0.8);
-    z-index: 50;
+  justify-content: center;
+  display: flex;
+  margin-left: 32px;
+  width: calc(100% - 64px);
+  height: 48px;
+  text-align: center;
+  line-height: 48px;
+  font-size: 25px;
+  color: rgba(255, 255, 255, 0.8);
+  z-index: 50;
 }
 
 .clock_turn {
-    justify-content: center;
-    display: flex;
-    margin-left: 32px;
-    width: calc(100% - 64px);
-    height: 16px;
-    position: relative;
-    top: 5px;
-    text-align: center;
-    line-height: 16px;
-    font-size: 15px;
-    color: #d4c6af;
-    z-index: 50;
+  justify-content: center;
+  display: flex;
+  margin-left: 32px;
+  width: calc(100% - 64px);
+  height: 16px;
+  position: relative;
+  top: 5px;
+  text-align: center;
+  line-height: 16px;
+  font-size: 15px;
+  color: #d4c6af;
+  z-index: 50;
 }
 
 .clock_priority_1,
 .clock_priority_2 {
-    margin: 6px;
+  margin: 6px;
 }
 
 .clock_priority_1,
 .clock_priority_2,
 .clock_pname1,
 .clock_pname2 {
-    width: 50%;
+  width: 50%;
 }
 
 .pname_priority {
-    color: #bdd6ff;
+  color: #bdd6ff;
 }
 
 .clock_prev,
 .draft_prev,
 .deck_prev,
 .odds_prev {
-    -webkit-app-region: no-drag;
-    position: absolute;
-    cursor: pointer;
-    background: url(../images/prev.png) no-repeat center;
-    z-index: 51;
-    display: block;
-    opacity: 0.5;
-    align-self: flex-start;
-    width: 32px;
-    height: 64px;
-    -webkit-transition: all 0.2s ease-in;
+  -webkit-app-region: no-drag;
+  position: absolute;
+  cursor: pointer;
+  background: url(../images/prev.png) no-repeat center;
+  z-index: 51;
+  display: block;
+  opacity: 0.5;
+  align-self: flex-start;
+  width: 32px;
+  height: 64px;
+  -webkit-transition: all 0.2s ease-in;
 }
 
 .clock_next,
 .draft_next,
 .deck_next,
 .odds_next {
-    -webkit-app-region: no-drag;
-    cursor: pointer;
-    position: absolute;
-    background: url(../images/next.png) no-repeat center;
-    z-index: 51;
-    opacity: 0.5;
-    align-self: flex-end;
-    display: block;
-    width: 32px;
-    height: 64px;
-    -webkit-transition: all 0.2s ease-in;
+  -webkit-app-region: no-drag;
+  cursor: pointer;
+  position: absolute;
+  background: url(../images/next.png) no-repeat center;
+  z-index: 51;
+  opacity: 0.5;
+  align-self: flex-end;
+  display: block;
+  width: 32px;
+  height: 64px;
+  -webkit-transition: all 0.2s ease-in;
 }
 
 .clock_prev:hover,
@@ -216,110 +216,110 @@ body {
 .deck_next:hover,
 .odds_prev:hover,
 .odds_next:hover {
-    opacity: 1;
+  opacity: 1;
 }
 
 .overlay_samplesize_container {
-    margin-top: 16px;
-    position: relative;
-    height: 32px;
-    flex-direction: column;
-    display: flex;
-    width: 100%;
+  margin-top: 16px;
+  position: relative;
+  height: 32px;
+  flex-direction: column;
+  display: flex;
+  width: 100%;
 }
 
 .odds_number {
-    width: 100%;
-    margin-top: auto;
-    text-align: center;
-    color: rgba(255, 255, 255, 0.85);
+  width: 100%;
+  margin-top: auto;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.85);
 }
 
 .odds_prev,
 .odds_next {
-    height: 44px;
+  height: 44px;
 }
 
 .overlay_card_quantity {
-    width: 100%;
-    display: flex;
-    justify-content: center;
-    margin-top: 8px;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  margin-top: 8px;
 }
 
 .inventory_card_quantity_blue {
-    width: 18px;
-    height: 18px;
-    display: inline-block;
-    background: center no-repeat url("../images/quantity_blue.png");
+  width: 18px;
+  height: 18px;
+  display: inline-block;
+  background: center no-repeat url("../images/quantity_blue.png");
 }
 
 .inventory_card_quantity_green {
-    width: 18px;
-    height: 18px;
-    display: inline-block;
-    background: center no-repeat url("../images/quantity_green.png");
+  width: 18px;
+  height: 18px;
+  display: inline-block;
+  background: center no-repeat url("../images/quantity_green.png");
 }
 
 .inventory_card_quantity_gray {
-    width: 18px;
-    height: 18px;
-    display: inline-block;
-    background: center no-repeat url("../images/quantity_gray.png");
+  width: 18px;
+  height: 18px;
+  display: inline-block;
+  background: center no-repeat url("../images/quantity_gray.png");
 }
 
 .inventory_card_quantity_orange {
-    width: 18px;
-    height: 18px;
-    display: inline-block;
-    background: center no-repeat url("../images/quantity_orange.png");
+  width: 18px;
+  height: 18px;
+  display: inline-block;
+  background: center no-repeat url("../images/quantity_orange.png");
 }
 
 .actionlog {
-    text-shadow: 2px 2px 2px rgb(0, 0, 0);
-    white-space: nowrap;
-    overflow: hidden;
-    height: 24px;
-    line-height: 24px;
-    width: 100%;
-    display: flex;
-    font-size: 14px;
-    background: linear-gradient(to right, rgba(0, 0, 0, 0.3), rgba(0, 0, 0, 0));
+  text-shadow: 2px 2px 2px rgb(0, 0, 0);
+  white-space: nowrap;
+  overflow: hidden;
+  height: 24px;
+  line-height: 24px;
+  width: 100%;
+  display: flex;
+  font-size: 14px;
+  background: linear-gradient(to right, rgba(0, 0, 0, 0.3), rgba(0, 0, 0, 0));
 }
 
 .log_p1 {
-    color: rgba(255, 200, 200, 1);
+  color: rgba(255, 200, 200, 1);
 }
 
 .log_p2 {
-    color: rgba(200, 200, 255, 1);
+  color: rgba(200, 200, 255, 1);
 }
 
 .log_p-1 {
-    color: rgba(255, 255, 255, 0.9);
-    font-weight: bold;
+  color: rgba(255, 255, 255, 0.9);
+  font-weight: bold;
 }
 
 .actionlog_time {
-    margin-left: 8px;
-    color: rgba(255, 255, 255, 0.8);
+  margin-left: 8px;
+  color: rgba(255, 255, 255, 0.8);
 }
 
 .actionlog_text {
-    margin-left: 8px;
+  margin-left: 8px;
 }
 
 .card_ability {
-    text-decoration: underline !important;
-    cursor: pointer;
+  text-decoration: underline !important;
+  cursor: pointer;
 }
 
 .card_link {
-    text-decoration: none;
-    font-weight: bold;
-    cursor: pointer;
+  text-decoration: none;
+  font-weight: bold;
+  cursor: pointer;
 }
 
 .card_link {
-    text-decoration: underline;
+  text-decoration: underline;
 }
