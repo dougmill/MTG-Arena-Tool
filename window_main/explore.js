@@ -227,7 +227,7 @@ function open_explore_tab(arg, loadMore) {
       "Only owned",
       "settings_owned",
       onlyOwned,
-      "update_explore_filters()"
+      update_explore_filters
     );
     lab.css("margin-top", "6px");
 

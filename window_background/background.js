@@ -504,6 +504,14 @@ function calculateRankWins() {
   history.rankwinrates = rankwinrates;
 }
 
+ipc.on("request_shuffler", (event, arg) => {
+  if (playerData.userName == "") {
+    ipc_send("offline", 1);
+  } else {
+    httpApi.httpGetShufflerData(arg);
+  }
+});
+
 ipc.on("request_explore", function(event, arg) {
   if (playerData.userName == "") {
     ipc_send("offline", 1);

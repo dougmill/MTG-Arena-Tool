@@ -315,6 +315,10 @@ span i {
   background: url(../images/tab_collection.png);
 }
 
+.icon_7 {
+  background: url(../images/tab_shuffler.png);
+}
+
 .top_nav_info {
   flex-grow: 1;
   display: flex;
@@ -2924,6 +2928,95 @@ a:hover {
   overflow-x: auto;
   overflow-y: visible;
   justify-content: center;
+}
+
+.shuffler_stats {
+  display: flex;
+  flex-direction: column;
+}
+
+.shuffler_table {
+  display: grid;
+  grid-template: none;
+  grid-auto-rows: 34px;
+  grid-auto-columns: 1fr;
+}
+
+.stats_params,
+.stats_title,
+.stats_column_header,
+.stats_row_header,
+.stats_cell,
+.prompt {
+  color: #fae5d2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.prompt {
+  font-weight: bold;
+  font-size: 20px;
+}
+
+.stats_param_label {
+  margin: 10px;
+  line-height: 20px;
+  font-size: 16px;
+  user-select: none;
+}
+
+.stats_column_header {
+  border: 1px solid;
+  border-top: 0;
+}
+
+.stats_row_header {
+  border: 1px solid;
+  border-left: 0;
+}
+
+.stats_cell {
+  border: 1px solid;
+}
+
+.stats_number_link {
+  cursor: pointer;
+}
+
+.stats_link {
+  background: url(../images/tab_shuffler.png) no-repeat center;
+  cursor: pointer;
+}
+
+.stats_link:hover {
+  background-image: url(../images/tab_shuffler_white.png);
+}
+
+.stats_footnote {
+  color: #fae5d2;
+  margin: 10px 10%;
+}
+
+.chart_selector {
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  white-space: nowrap;
+  float: left;
+  width: 120px;
+}
+
+.chart_select_cell {
+  color: #fae5d2;
+  border-top: 1px solid;
+  border-bottom: 1px solid;
+  cursor: pointer;
+}
+
+.graph {
+  position: relative;
 }
 
 .top_wildcards_cont {
