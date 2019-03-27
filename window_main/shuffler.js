@@ -674,6 +674,7 @@ function updateLandsTable() {
       prompt.appendTo(landsTableDiv);
     }
   } else {
+    landsTableDiv.html("");
     let bestOfStats = pathToVal(
       deckLandStats,
       currentQuery.deckSize,
