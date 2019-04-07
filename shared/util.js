@@ -837,11 +837,19 @@ function addCardTile(grpId, indent, quantity, element) {
  * Creates a select box
  * This is a "fixed" version of SelectAdd and should replace it.
  **/
-function createSelect(parent, options, current, callback, divClass) {
+function createSelect(
+  parent,
+  options,
+  current,
+  callback,
+  divClass,
+  { canBeEmpty = false, width } = {}
+) {
   let selectContainer = createDivision(["select_container", divClass]);
   selectContainer.id = divClass;
-  if (!options.includes(current)) current = options[0];
+  if (!canBeEmpty && !options.includes(current)) current = options[0];
   selectContainer.value = current;
+  if (width) selectContainer.style.width = width;
 
   let selectButton = createDivision(["select_button"], current);
   let selectOptions = createDivision(["select_options_container"]);
@@ -1016,7 +1024,7 @@ function attachOwnerhipStars(card, starContainer) {
     let color = "gray";
 
     if (i < owned) color = "green";
-    if (aquired && i >= owned-aquired && i < owned) color = "orange";
+    if (aquired && i >= owned - aquired && i < owned) color = "orange";
 
     starContainer.appendChild(
       createDivision([`inventory_card_quantity_${color}`])

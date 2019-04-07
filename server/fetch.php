@@ -152,7 +152,7 @@ if (array_key_exists('deckSize', $query) && array_key_exists('landsInDeck', $que
     echo '{"lands":';
     echo json_encode(iterator_to_array($cursor, false));
 
-    // Hand and card stats take up little enough space that it's reasonable to return it all.
+    // Hand, card, and position stats take up little enough space that it's reasonable to return it all.
     $mongo_hands = (new MongoDB\Client)->tracker->hand_stats;
     $pipeline = [[
         '$project' => [
@@ -169,6 +169,11 @@ if (array_key_exists('deckSize', $query) && array_key_exists('landsInDeck', $que
     $mongo_cards = (new MongoDB\Client)->tracker->card_stats;
     $cursor = $mongo_cards->aggregate($pipeline, [ 'allowDiskUse' => TRUE ]);
     echo ',"cards":';
+    echo json_encode(iterator_to_array($cursor, false));
+
+    $mongo_positions = (new MongoDB\Client)->tracker->position_stats;
+    $cursor = $mongo_positions->aggregate($pipeline, [ 'allowDiskUse' => TRUE ]);
+    echo ',"positions":';
     echo json_encode(iterator_to_array($cursor, false));
     echo '}';
 }

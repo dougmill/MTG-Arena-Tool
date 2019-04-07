@@ -10,7 +10,7 @@ globals
 	hypergeometricDistribution,
 	ipc_send,
 	makeId,
-	selectAdd
+	createSelect
 */
 
 const Chart = require("chart.js");
@@ -620,21 +620,21 @@ function addQuerySelect(
   values,
   ...updateListeners
 ) {
-  let select = $("<select></select>");
-  values.forEach(value =>
-    select.append(
-      $(`<option value="${value}">${String(value).capitalize()}</option>`)
-    )
-  );
-  select.appendTo(div);
   function onUpdate(value) {
     valueObject[valueField] = typeof values[0] === "string" ? value : +value;
     updateListeners.forEach(func => func());
   }
-  selectAdd(select, onUpdate, String(values[0]).length > 3 ? 130 : 100);
-  select
-    .next("div.select-styled")
-    .text(String(valueObject[valueField] || "").capitalize());
+  createSelect(
+    div[0],
+    values,
+    String(valueObject[valueField] || ""),
+    onUpdate,
+    "query_select",
+    {
+      canBeEmpty: true,
+      width: String(values[0]).length > 3 ? "130px" : "100px"
+    }
+  );
 }
 
 function updateLandsTable() {
