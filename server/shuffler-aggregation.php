@@ -101,6 +101,9 @@ $land_pipeline = [
         // most 3 mulligans. This captures an overwhelming majority of games while keeping my estimate for total space
         // less than 100 MB.
         '$match' => [
+            'gameStats.handLands' => [
+                '$exists' => TRUE
+            ],
             '$expr' => [
                 '$lte' => [
                     [
@@ -829,6 +832,9 @@ $card_pipeline = [
         // most 3 mulligans. This captures an overwhelming majority of games while keeping my estimate for total space
         // less than 100 MB.
         '$match' => [
+            'gameStats.handLands' => [
+                '$exists' => TRUE
+            ],
             '$expr' => [
                 '$lte' => [
                     [
@@ -839,6 +845,8 @@ $card_pipeline = [
             ],
             '$and' => [
                 [
+                    'gameStats.shuffledOrder' => [ '$exists' => TRUE ]
+                ], [
                     // There was a bug where cards stolen by Thief of Sanity were recorded incorrectly. This filters
                     // out affected games.
                     'gameStats.shuffledOrder' => [ '$ne' => 3 ]
@@ -1371,7 +1379,10 @@ $position_pipeline = [
                         '$lt' => '2019-03-27T12:00:00.000Z'
                     ]
                 ]
-            ]
+            ],
+            // Sometimes, such as on concede during mulligan, the opening hand is not known and gets recorded as being
+            // empty. Filter such games out to prevent them being counted as having 0 relevant cards in hand.
+            'handsDrawn' => [ '$ne' => [] ]
         ]
     ], [
         '$project' => [
