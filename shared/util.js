@@ -18,6 +18,8 @@ const GREEN = 5;
 const math = require("mathjs");
 math.config({ precision: 2000 });
 
+const jStat = require("jStat").jStat;
+
 const Database = require("../shared/database.js");
 const cardsDb = new Database();
 
@@ -2386,6 +2388,16 @@ function add(a, b) {
 }
 
 //
+function compareNumbers(a, b) {
+  return a - b;
+}
+
+// For when some falsey values need to pass the check.
+function hasValue(o) {
+  return o !== null && o !== undefined;
+}
+
+//
 Array.prototype.sum = function(prop) {
   var total = 0;
   for (var i = 0, _len = this.length; i < _len; i++) {
@@ -2466,14 +2478,68 @@ function hypergeometricRange(
   return returnBig ? probability : math.number(probability);
 }
 
-// This function is designed to assess the "significance" of a particular result by calculating an alternative to
-// percentile designed to measure deviation from median in both directions the same way and ensure the average returned
-// value (assuming true random) is always 50%. This is done by treating the given result as a range of values
-// distributed evenly throughout the percentile range covered by the result. For example, a result of 0 that has a 20%
-// chance of happening is treated as a composite distributed evenly by percentile through the 0% to 20% percentile
-// range. The returned value is the probability that a result is at least as far from median as the given value. Return
-// values close to 1 indicate the passed in value was very close to average, return values close to 0 indicate it was
-// very far from average.
+// Returns an array of the probabilities (between 0 and 1) indexed by the number
+// of hits in the sample. Index values range from 0 to sample, though some of
+// them may have probability 0.
+function hypergeometricDistribution(
+  population,
+  sample,
+  hitsInPop,
+  returnBig = false
+) {
+  let missesInPop = population - hitsInPop;
+  let distribution = [];
+  let hitsInSample = 0;
+  for (; hitsInSample < sample - missesInPop; hitsInSample++) {
+    distribution[hitsInSample] = returnBig ? math.bignumber(0) : 0;
+  }
+  let hitCombos = math.combinations(
+    math.bignumber(hitsInPop),
+    math.bignumber(hitsInSample)
+  );
+  let missCombos = math.combinations(
+    math.bignumber(missesInPop),
+    math.bignumber(sample - hitsInSample)
+  );
+  let totalCombos = math.combinations(
+    math.bignumber(population),
+    math.bignumber(sample)
+  );
+  for (; hitsInSample <= hitsInPop && hitsInSample <= sample; hitsInSample++) {
+    let probability = math.divide(
+      math.multiply(hitCombos, missCombos),
+      totalCombos
+    );
+    distribution[hitsInSample] = returnBig
+      ? probability
+      : math.number(probability);
+    let missesInSample = sample - hitsInSample;
+    hitCombos = math.divide(
+      math.multiply(hitCombos, hitsInPop - hitsInSample),
+      hitsInSample + 1
+    );
+    missCombos = math.divide(
+      math.multiply(missCombos, missesInSample),
+      missesInPop - missesInSample + 1
+    );
+  }
+  for (; hitsInSample <= sample; hitsInSample++) {
+    distribution[hitsInSample] = returnBig ? math.bignumber(0) : 0;
+  }
+  return distribution;
+}
+
+// This function is designed to assess the "significance" of a particular result
+// by calculating an alternative to percentile designed to measure deviation
+// from median in both directions the same way and ensure the average returned
+// value (assuming true random) is always 50%. This is done by treating the
+// given result as a range of values distributed evenly throughout the
+// percentile range covered by the result. For example, a result of 0 that has a
+// 20% chance of happening is treated as a composite distributed evenly by
+// percentile through the 0% to 20% percentile range. The returned value is the
+// probability that a result is at least as far from median as the given value.
+// Return values close to 1 indicate the passed in value was very close to
+// average, return values close to 0 indicate it was very far from average.
 function hypergeometricSignificance(
   value,
   population,
@@ -2508,7 +2574,8 @@ function hypergeometricSignificance(
     let retVal = math.multiply(midpoint, 2);
     return returnBig ? retVal : math.number(retVal);
   }
-  // If we get here, then value is the median and we need to weight things for how off-center its percentile range is.
+  // If we get here, then value is the median and we need to weight things for
+  // how off-center its percentile range is.
   let smaller, larger;
   if (math.smallerEq(percentile, reversePercentile)) {
     smaller = percentile;
@@ -2517,8 +2584,9 @@ function hypergeometricSignificance(
     smaller = reversePercentile;
     larger = percentile;
   }
-  // Divide the range into a symmetric portion centered on .5, and another portion for the rest. Calculate the average
-  // distance from center for each, and use the average of that weighted by each portion's size.
+  // Divide the range into a symmetric portion centered on .5, and another
+  // portion for the rest. Calculate the average distance from center for each,
+  // and use the average of that weighted by each portion's size.
   let centeredSize = math.multiply(math.subtract(smaller, 0.5), 2);
   let otherSize = math.subtract(larger, smaller);
   let centeredAverage = math.divide(centeredSize, 4); // half for being centered, half again for average
@@ -2534,4 +2602,45 @@ function hypergeometricSignificance(
   );
   let retVal = math.subtract(1, math.multiply(weightedAverage, 2));
   return returnBig ? retVal : math.number(retVal);
+}
+
+//
+function cumulativeBinomial(trials, lowerBound, upperBound, probability) {
+  // Allow a little room for rounding errors.
+  if (
+    lowerBound > upperBound ||
+    lowerBound > trials + 0.5 ||
+    upperBound < -0.5
+  ) {
+    return 0;
+  }
+  lowerBound = Math.min(lowerBound, trials);
+  upperBound = Math.max(upperBound, 0);
+  let numProb = math.number(probability);
+  if (numProb === 0) {
+    return lowerBound <= 0.5 ? 1 : 0;
+  }
+  if (numProb === 1) {
+    return upperBound >= trials - 0.5 ? 1 : 0;
+  }
+
+  function approx(bound) {
+    // ibeta here is the "regularized incomplete beta function", which the
+    // exact value of the binomial cumulative probability can be easily
+    // expressed in terms of, as described on Wikipedia at
+    // https://en.wikipedia.org/wiki/Binomial_distribution#Cumulative_distribution_function
+    // This function in turn can be calculated to arbitrary precision with a
+    // continued fraction with a repeating pattern that converges pretty
+    // quickly, which makes this many times faster than calculating directly
+    // from the binomial definition, especially as the number of trials gets
+    // large. This implementation should be accurate to 6 decimal places, I
+    // think. This incidentally also allows generalizing for non-integer ranges.
+    return jStat.ibeta(1 - numProb, trials - bound, bound + 1);
+  }
+
+  return lowerBound === 0
+    ? approx(upperBound)
+    : upperBound === trials
+    ? 1 - approx(lowerBound - 1)
+    : approx(upperBound) - approx(lowerBound - 1);
 }

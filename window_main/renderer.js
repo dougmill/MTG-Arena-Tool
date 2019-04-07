@@ -46,6 +46,8 @@ const expandEvent = require("./events").expandEvent;
 const open_economy_tab = require("./economy").open_economy_tab;
 const set_economy_history = require("./economy").set_economy_history;
 
+const open_shuffler_tab = require("./shuffler").open_shuffler_tab;
+const receiveStats = require("./shuffler").receiveStats;
 
 var orderedCardTypes = ["cre", "lan", "ins", "sor", "enc", "art", "pla"];
 var orderedCardTypesDesc = [
@@ -138,8 +140,8 @@ let mana = {
 };
 
 function ipc_send(method, arg, to = windowBackground) {
-  // 0: Main window
-  // 1: background
+  // 0: background
+  // 1: Main window
   // 2: overlay
   ipc.send("ipc_switch", method, windowRenderer, arg, to);
 }
@@ -791,12 +793,9 @@ function installUpdate() {
 }
 
 function force_open_settings() {
-  sidebarActive = 6;
+  sidebarActive = 7;
   $(".top_nav_item").each(function() {
     $(this).removeClass("item_selected");
-    if ($(this).hasClass("it6")) {
-      $(this).addClass("item_selected");
-    }
   });
   $(".moving_ux").animate({ left: "0px" }, 250, "easeInOutCubic");
   open_settings(lastSettingsSection);
@@ -806,9 +805,6 @@ function force_open_about() {
   sidebarActive = 9;
   $(".top_nav_item").each(function() {
     $(this).removeClass("item_selected");
-    if ($(this).hasClass("it7")) {
-      $(this).addClass("item_selected");
-    }
   });
   $(".moving_ux").animate({ left: "0px" }, 250, "easeInOutCubic");
   open_settings(5);
@@ -941,7 +937,7 @@ $(document).ready(function() {
       }
       if ($(this).hasClass("it6")) {
         sidebarActive = 6;
-        open_settings(lastSettingsSection);
+        open_shuffler_tab();
       }
     } else {
       $(".moving_ux").animate({ left: "0px" }, 250, "easeInOutCubic");
@@ -994,6 +990,11 @@ ipc.on("tou_set", function(event, arg) {
   document.body.style.cursor = "auto";
   open_tournament(arg);
   $(".moving_ux").animate({ left: "-100%" }, 250, "easeInOutCubic");
+});
+
+//
+ipc.on("set_shuffler_data", (event, arg) => {
+  receiveStats(arg);
 });
 
 //
@@ -1951,12 +1952,11 @@ function toggleVisibility(...ids) {
 }
 
 //
-function add_checkbox(div, label, iid, def, func = "updateSettings()") {
+function add_checkbox(div, label, iid, def, func = updateSettings) {
   label = $('<label class="check_container hover_label">' + label + "</label>");
   label.appendTo(div);
-  var check_new = $(
-    '<input type="checkbox" id="' + iid + '" onclick="' + func + '" />'
-  );
+  var check_new = $('<input type="checkbox" id="' + iid + '" />');
+  check_new.click(func);
   check_new.appendTo(label);
   check_new.prop("checked", def);
 

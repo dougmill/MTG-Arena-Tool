@@ -18,6 +18,9 @@ const async = require("async");
 const qs = require("qs");
 let metadataState = false;
 
+const transformShufflerStats = require("./shuffler-transform")
+  .transformShufflerStats;
+
 var httpAsync = [];
 httpBasic();
 httpGetDatabase();
@@ -330,6 +333,13 @@ function httpBasic() {
                 body: parsedResult.state
               });
               //ipc_send("popup", {"text": parsedResult.state, "time": 10000});
+            } else if (parsedResult && _headers.method == "get_shuffler_data") {
+              // Manually stringify because the automatic json conversion
+              // doesn't preserve indexes in sparse arrays.
+              ipc_send(
+                "set_shuffler_data",
+                JSON.stringify(transformShufflerStats(parsedResult))
+              );
             } else if (
               parsedResult &&
               parsedResult.ok == false &&
@@ -360,7 +370,7 @@ function httpBasic() {
               });
             }
           } catch (e) {
-            console.error(e.message);
+            console.error(e);
           }
           try {
             callback();
@@ -451,6 +461,16 @@ function httpSetPlayer() {
   // useless I think
   //var _id = makeId(6);
   //httpAsync.push({'reqId': _id, 'method': 'set_player', 'name': name, 'rank': rank, 'tier': tier});
+}
+
+function httpGetShufflerData(query) {
+  let _id = makeId(6);
+  httpAsync.unshift({
+    reqId: _id,
+    method: "get_shuffler_data",
+    method_path: "/shuffler_test/fetch.php",
+    ...query
+  });
 }
 
 function httpGetExplore(query, collection) {
@@ -677,6 +697,7 @@ module.exports = {
   httpAuth,
   httpSubmitCourse,
   httpSetPlayer,
+  httpGetShufflerData,
   httpGetExplore,
   httpGetTopLadderDecks,
   httpGetTopLadderTraditionalDecks,

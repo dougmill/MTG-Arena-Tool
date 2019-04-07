@@ -6,7 +6,7 @@ const fs = require('fs');
 // Some other things should go here later, like updating from MTGA Servers themselves.
 class Database {
   constructor() {
-    let json = JSON.parse(fs.readFileSync(`${__dirname}/../resources/database.json`, 'utf8'));   
+    let json = JSON.parse(fs.readFileSync(`${__dirname}/../resources/database.json`, 'utf8'));
     this.cards = json;
   }
 
