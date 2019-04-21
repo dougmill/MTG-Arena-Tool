@@ -1316,9 +1316,9 @@ $position_pipeline = [
             'date' => 1
         ]
     ], [
-        '$limit' => 2000
+        '$limit' => 1000
     ], [
-        // By this point, we have the (at most) 2000 earliest matches that both are in the target date range and have
+        // By this point, we have the (at most) 1000 earliest matches that both are in the target date range and have
         // shuffler data. Now trim out the non relevant fields.
         '$project' => [
             '_id' => 0,
@@ -1359,13 +1359,9 @@ $position_pipeline = [
             'deckList' => [
                 '$exists' => TRUE
             ],
-            // The overwhelming majority of games have either 40 or 60 cards, to the point where there would be little
-            // benefit from analyzing this aggregation for other deck sizes.
-            'deckSize' => [
-                '$in' => [
-                    40, 60
-                ]
-            ],
+            // The overwhelming majority of games have 60 cards, to the point where there would be little benefit from
+            // analyzing this aggregation for other deck sizes.
+            'deckSize' => 60,
             // The March update to Arena changed the format of most logged decklists, requiring a hotfix update to Tool
             // to handle it. Any games recorded by the previous version of Tool after Arena updated almost certainly
             // have missing or incorrect decklists, so filter them out.
@@ -1380,35 +1376,73 @@ $position_pipeline = [
                     ]
                 ]
             ],
-            // Sometimes, such as on concede during mulligan, the opening hand is not known and gets recorded as being
+            // Sometimes, if the game is conceded very early, the opening hand is not known and gets recorded as being
             // empty. Filter such games out to prevent them being counted as having 0 relevant cards in hand.
-            'handsDrawn' => [ '$ne' => [] ]
+            'handsDrawn' => [
+                '$ne' => []
+            ],
+            // There should be vanishingly few games with the same card in multiple places in the decklist, but check
+            // anyway just in case. Keep only games with the same number of unique cards as entries in the decklist.
+            '$expr' => [
+                '$eq' => [
+                    [
+                        '$size' => '$deckList'
+                    ], [
+                        '$size' => [
+                            // Find unique card ids. Have to work around the fact that the various set operators only
+                            // work with an array of expressions, not an expression that evaluates to an array. So,
+                            // using $reduce.
+                            '$reduce' => [
+                                'input' => '$deckList',
+                                'initialValue' => [],
+                                'in' => [
+                                    '$setUnion' => [
+                                        '$$value', [
+                                            '$$this.id'
+                                        ]
+                                    ]
+                                ]
+                            ]
+                        ]
+                    ]
+                ]
+            ]
         ]
     ], [
         '$project' => [
             'date' => 1,
-            // In case WotC changed shuffling without mentioning it in release notes, keep separate records for each
-            // Arena release. Tool began recording this data in January, when Arena version 0.11 was current.
-            'update' => [
-                '$switch' => [
-                    'branches' => [
-                        [
-                            'case' => [
-                                '$lt' => [
-                                    '$date', '2019-02-14T14:00:00.000Z'
+            // To be sure of being able to notice an unannounced fix promptly, keep separate records for each week.
+            // Split the weeks at midnight UTC Thursday morning, joining the fragment of a week following the release
+            // that started recording opening hands with the following week.
+            'week' => [
+                '$max' => [
+                    [
+                        '$toInt' => [
+                            '$ceil' => [
+                                '$divide' => [
+                                    [
+                                        // Feb 7 is the Thursday following the first full week of opening hands being
+                                        // recorded.
+                                        '$subtract' => [
+                                            [
+                                                '$dateFromString' => [
+                                                    'dateString' => '$date'
+                                                ]
+                                            ], [
+                                                '$dateFromString' => [
+                                                    'dateString' => '2019-02-07T00:00:00.000Z'
+                                                ]
+                                            ]
+                                        ]
+                                    ],
+                                    // Number of milliseconds in a week. 7 * 24 * 60 * 60 * 1000
+                                    604800000
                                 ]
-                            ],
-                            'then' => 11
-                        ], [
-                            'case' => [
-                                '$lt' => [
-                                    '$date', '2019-03-27T12:00:00.000Z'
-                                ]
-                            ],
-                            'then' => 12
+                            ]
                         ]
                     ],
-                    'default' => 13
+                    // Anything before Feb 7 is week 0.
+                    0
                 ]
             ],
             // The decklist format was not designed with this kind of analysis in mind, so it's a bit inconvenient to
@@ -1426,243 +1460,44 @@ $position_pipeline = [
             //      [
             //          // Index has no real meaning, it's just a collection of objects.
             //          {
-            //              end: <'front' or 'back'>,
-            //              numCards: <total number of cards, accounting for quantity, in the range being considered>,
-            //              handCounts: <array of how many cards from that range were in each drawn hand>
+            //              // numCards is omitted for estimations that assume a card is equally likely to be any of its
+            //              // copies
+            //              numCards: <total number of cards, accounting for quantity, that are considered relevant at
+            //                         each position>,
+            //              distribution: [ // index is number of mulligans
+            //                  [ // index is 0-based position in the decklist of the first relevant card
+            //                      [ // index is number of relevant cards in the drawn hand
+            //                          <0 or 1 for whether this game matches, or a fraction if doing estimations and
+            //                           the card has multiple copies>
+            //                      ]
+            //                  ]
+            //              ]
             //          }
             //      ]
             'stats' => [
                 '$let' => [
                     'vars' => [
-                        'bounds' => [
-                            // First, find a suitable range of cards, if possible, at each of the front and the back.
-                            // For 40 card decks, look for 15 to 18 cards. For 60 card decks, look for 22 to 25 cards.
-                            // If there are multiple acceptable ranges to choose from, prefer the option closest to
-                            // 17 or 24, breaking ties by choosing the smaller one. This reduce operation scans through
-                            // the decklist, counting cards and moving the bounds as it goes, until it finds the best
-                            // option and stops moving each bound.
+                      // Using the example decklist, this will be [68310, 68310, 68310, 68310, 68096, 68096, 68096,
+                      // ...]. Having this form greatly simplifies position-based checks.
+                        'deckArray' => [
                             '$reduce' => [
                                 'input' => '$deckList',
-                                'initialValue' => [
-                                    // The index in the decklist of the card group being examined.
-                                    'index' => 0,
-                                    // The number of cards, accounting for quantity, that have already been checked.
-                                    'cards' => 0,
-                                    // The smallest acceptable number of cards.
-                                    'minTarget' => [
-                                        '$cond' => [
-                                            [
-                                                '$eq' => [
-                                                    '$deckSize', 40
-                                                ]
-                                            ], 15, 22
-                                        ]
-                                    ],
-                                    // The largest acceptable number of cards.
-                                    'maxTarget' => [
-                                        '$cond' => [
-                                            [
-                                                '$eq' => [
-                                                    '$deckSize', 40
-                                                ]
-                                            ], 18, 25
-                                        ]
-                                    ],
-                                    // Index where the front range ends, exclusive.
-                                    'frontBound' => 0,
-                                    // Index where the back range starts, inclusive.
-                                    'backBound' => 0
-                                ],
+                                'initialValue' => [],
                                 'in' => [
-                                    // Track the index as we go.
-                                    'index' => [
-                                        '$add' => [
-                                            '$$value.index', 1
-                                        ]
-                                    ],
-                                    'cards' => [
-                                        '$add' => [
-                                            '$$value.cards', '$$this.quantity'
-                                        ]
-                                    ],
-                                    'minTarget' => '$$value.minTarget',
-                                    'maxTarget' => '$$value.maxTarget',
-                                    'frontBound' => [
-                                        '$switch' => [
-                                            'branches' => [
-                                                [
-                                                    // First branch: Is it time to stop moving the front bound?
-                                                    'case' => [
-                                                        '$or' => [
-                                                            [
-                                                                // If not equal, then it's already been stopped.
-                                                                '$ne' => [
-                                                                    '$$value.index', '$$value.frontBound'
-                                                                ]
-                                                            ], [
-                                                                // If moving it would go past the acceptable range, and
-                                                                // it is currently in the acceptable range, then stop.
-                                                                '$and' => [
-                                                                    [
-                                                                        '$gt' => [
-                                                                            [
-                                                                                '$add' => [
-                                                                                    '$$value.cards', '$$this.quantity'
-                                                                                ]
-                                                                            ], '$$value.maxTarget'
-                                                                        ]
-                                                                    ], [
-                                                                        '$gte' => [
-                                                                            '$$value.cards', '$$value.minTarget'
-                                                                        ]
-                                                                    ]
-                                                                ]
-                                                            ], [
-                                                                // If already in acceptable range, don't go to the max
-                                                                // of the range from anywhere except the min - anywhere
-                                                                // else is either the ideal spot or wins the tiebreaker.
-                                                                '$and' => [
-                                                                    [
-                                                                        '$gt' => [
-                                                                            '$$value.cards', '$$value.minTarget'
-                                                                        ]
-                                                                    ], [
-                                                                        '$eq' => [
-                                                                            [
-                                                                                '$add' => [
-                                                                                    '$$value.cards', '$$this.quantity'
-                                                                                ]
-                                                                            ], '$$value.maxTarget'
-                                                                        ]
-                                                                    ]
-                                                                ]
-                                                            ]
-                                                        ]
-                                                    ],
-                                                    // Front bound either has already stopped or should be stopped now.
-                                                    'then' => '$$value.frontBound'
-                                                ], [
-                                                    // Second branch: We're not in the acceptable range yet, otherwise
-                                                    // the first branch would have been taken. Does this card skip over
-                                                    // the acceptable range entirely?
-                                                    'case' => [
-                                                        '$gt' => [
-                                                            [
-                                                                '$add' => [
-                                                                    '$$value.cards', '$$this.quantity'
-                                                                ]
-                                                            ], '$$value.maxTarget'
-                                                        ]
-                                                    ],
-                                                    // Use an invalid value to mark that there's no acceptable range.
-                                                    'then' => -1
-                                                ]
-                                            ],
-                                            // Not time to stop, haven't gone too far, so keep it moving.
-                                            'default' => [
-                                                '$add' => [
-                                                    '$$value.frontBound', 1
-                                                ]
-                                            ]
-                                        ]
-                                    ],
-                                    'backBound' => [
-                                        '$switch' => [
-                                            'branches' => [
-                                                [
-                                                    // First branch: Is it time to stop moving the back bound?
-                                                    'case' => [
-                                                        '$or' => [
-                                                            [
-                                                                // If not equal, then it's already been stopped.
-                                                                '$ne' => [
-                                                                    '$$value.index', '$$value.backBound'
-                                                                ]
-                                                            ], [
-                                                                // If moving it would go past the acceptable range, and
-                                                                // it is currently in the acceptable range, then stop.
-                                                                '$and' => [
-                                                                    [
-                                                                        '$gt' => [
-                                                                            [
-                                                                                '$add' => [
-                                                                                    '$$value.cards', '$$this.quantity'
-                                                                                ]
-                                                                            ], [
-                                                                                '$subtract' => [
-                                                                                    '$deckSize', '$$value.minTarget'
-                                                                                ]
-                                                                            ]
-                                                                        ]
-                                                                    ], [
-                                                                        '$gte' => [
-                                                                            '$$value.cards', [
-                                                                                '$subtract' => [
-                                                                                    '$deckSize', '$$value.maxTarget'
-                                                                                ]
-                                                                            ]
-                                                                        ]
-                                                                    ]
-                                                                ]
-                                                            ], [
-                                                                // If at exactly the max acceptable range, and this card
-                                                                // would move to the min - the only value less preferred
-                                                                // - then stop.
-                                                                '$and' => [
-                                                                    [
-                                                                        '$eq' => [
-                                                                            '$$value.cards', [
-                                                                                '$subtract' => [
-                                                                                    '$deckSize', '$$value.maxTarget'
-                                                                                ]
-                                                                            ]
-                                                                        ]
-                                                                    ], [
-                                                                        '$eq' => [
-                                                                            '$$this.quantity', 3
-                                                                        ]
-                                                                    ]
-                                                                ]
-                                                            ], [
-                                                                // If in the acceptable range and not at the max of it,
-                                                                // then stop.
-                                                                '$gt' => [
-                                                                    '$$value.cards', [
-                                                                        '$subtract' => [
-                                                                            '$deckSize', '$$value.maxTarget'
-                                                                        ]
-                                                                    ]
-                                                                ]
-                                                            ]
-                                                        ]
-                                                    ],
-                                                    // Back bound either has already stopped or should be stopped now.
-                                                    'then' => '$$value.backBound'
-                                                ], [
-                                                    // Second branch: We're not in the acceptable range yet, otherwise
-                                                    // the first branch would have been taken. Does this card skip over
-                                                    // the acceptable range entirely?
-                                                    'case' => [
-                                                        '$gt' => [
-                                                            [
-                                                                '$add' => [
-                                                                    '$$value.cards', '$$this.quantity'
-                                                                ]
-                                                            ], [
-                                                                '$subtract' => [
-                                                                    '$deckSize', '$$value.minTarget'
-                                                                ]
-                                                            ]
-                                                        ]
-                                                    ],
-                                                    // Use an invalid value to mark that there's no acceptable range.
-                                                    'then' => -1
-                                                ]
-                                            ],
-                                            // Not time to stop, haven't gone too far, so keep it moving.
-                                            'default' => [
-                                                '$add' => [
-                                                    '$$value.backBound', 1
+                                    '$concatArrays' => [
+                                        '$$value', [
+                                            '$map' => [
+                                                'input' => [
+                                                    '$range' => [
+                                                        0, '$$this.quantity'
+                                                    ]
+                                                ],
+                                                'as' => 'ignored',
+                                                // Older decklists have card ids as strings, but in opening hands and
+                                                // most other places they're integers. Do the conversion so comparisons
+                                                // will work.
+                                                'in' => [
+                                                    '$toInt' => '$$this.id'
                                                 ]
                                             ]
                                         ]
@@ -1670,125 +1505,293 @@ $position_pipeline = [
                                 ]
                             ]
                         ],
-                        'quantities' => '$deckList.quantity',
-                        // The decklist has card ids as strings, but in opening hands and most other places they're
-                        // integers. Do the conversion so comparisons will work.
-                        'ids' => [
-                            '$map' => [
-                                'input' => '$deckList.id',
-                                'as' => 'cardId',
+                        // This is used in estimations to get stats for every position from *every* game, on the
+                        // assumption of a correct shuffler where any drawn copy of a card would be equally likely to be
+                        // any of the copies that went into the shuffler. In such estimations, each card drawn has its 1
+                        // game split evenly among the positions it could have come from - card weight per position is
+                        // 1/quantity in decklist.
+                        'cardEstimationWeights' => [
+                            '$reduce' => [
+                                'input' => '$deckList',
+                                'initialValue' => [],
                                 'in' => [
-                                    '$toInt' => '$$cardId'
+                                    '$concatArrays' => [
+                                        '$$value', [
+                                            '$map' => [
+                                                'input' => [
+                                                    '$range' => [
+                                                        0, '$$this.quantity'
+                                                    ]
+                                                ],
+                                                'as' => 'ignored',
+                                                'in' => [
+                                                    '$divide' => [
+                                                        1, '$$this.quantity'
+                                                    ]
+                                                ]
+                                            ]
+                                        ]
+                                    ]
                                 ]
                             ]
                         ]
                     ],
                     'in' => [
                         '$map' => [
+                            // The various quantities of cards that I'm interested in. 0 is used to indicate doing the
+                            // estimation and will be filtered out later. Index is meaningless for this one.
                             'input' => [
-                                // Generate an entry for the front and for the back, but filter out invalid ones.
-                                '$filter' => [
-                                    'input' => [
-                                        [
-                                            'end' => 'front',
-                                            'bound' => '$$bounds.frontBound',
-                                            'numCards' => [
-                                                '$sum' => [
-                                                    '$slice' => [
-                                                        '$$quantities', '$$bounds.frontBound'
-                                                    ]
-                                                ]
-                                            ],
-                                            'idsToCheck' => [
-                                                '$slice' => [
-                                                    '$$ids', '$$bounds.frontBound'
-                                                ]
-                                            ],
-                                            // There should be vanishingly few games with the same card in multiple
-                                            // places in the decklist, but check anyway just in case.
-                                            'ambiguousIds' => [
-                                                '$setIntersection' => [
-                                                    [
-                                                        '$slice' => [
-                                                            '$$ids', '$$bounds.frontBound'
-                                                        ]
-                                                    ], [
-                                                        '$slice' => [
-                                                            '$$ids', '$$bounds.frontBound', 60
-                                                        ]
-                                                    ]
-                                                ]
-                                            ]
-                                        ], [
-                                            'end' => 'back',
-                                            'bound' => '$$bounds.backBound',
-                                            'numCards' => [
-                                                '$sum' => [
-                                                    '$slice' => [
-                                                        '$$quantities', '$$bounds.backBound', 60
-                                                    ]
-                                                ]
-                                            ],
-                                            'idsToCheck' => [
-                                                '$slice' => [
-                                                    '$$ids', '$$bounds.backBound', 60
-                                                ]
-                                            ],
-                                            // There should be vanishingly few games with the same card in multiple
-                                            // places in the decklist, but check anyway just in case.
-                                            'ambiguousIds' => [
-                                                '$setIntersection' => [
-                                                    [
-                                                        '$slice' => [
-                                                            '$$ids', '$$bounds.backBound'
-                                                        ]
-                                                    ], [
-                                                        '$slice' => [
-                                                            '$$ids', '$$bounds.backBound', 60
-                                                        ]
-                                                    ]
-                                                ]
-                                            ]
-                                        ]
-                                    ],
-                                    'as' => 'info',
-                                    'cond' => [
-                                        // bound = -1 is used to indicate there's no acceptable number of cards that
-                                        // will work. If ambiguousIds is not empty, then there's a card that has copies
-                                        // both inside and outside the relevant section of the decklist. In either case,
-                                        // drop the entry.
-                                        '$and' => [
-                                            [
-                                                '$ne' => [
-                                                    '$$info.bound', -1
-                                                ]
-                                            ], [
-                                                '$eq' => [[ '$size' => '$$info.ambiguousIds' ], 0]
-                                            ]
-                                        ]
-                                    ]
-                                ]
+                                0, 1, 2, 3, 4, 22, 23, 24, 25
                             ],
-                            'as' => 'info',
+                            'as' => 'numCards',
                             'in' => [
-                                'end' => '$$info.end',
-                                'numCards' => '$$info.numCards',
-                                // handsDrawn in the input is a 2 dimensional array, with each 1 dimensional array being
-                                // a hand that was kept or mulliganed, and each value in a hand being a card id. Reduce
-                                // each hand to a count of how many cards in it came from the region of the decklist
-                                // being considered.
-                                'handCounts' => [
+                                'numCards' => '$$numCards',
+                                'distribution' => [
                                     '$map' => [
-                                        'input' => '$handsDrawn',
-                                        'as' => 'hand',
+                                        // The outer index, number of mulligans from 0 to 6 inclusive.
+                                        'input' => [
+                                            '$range' => [
+                                                0, 7
+                                            ]
+                                        ],
+                                        'as' => 'mulligans',
                                         'in' => [
-                                            '$size' => [
-                                                '$filter' => [
-                                                    'input' => '$$hand',
-                                                    'as' => 'card',
-                                                    'cond' => [
-                                                        '$in' => [
-                                                            '$$card', '$$info.idsToCheck'
+                                            '$map' => [
+                                                // Middle index, position in the decklist of the first relevant card. If
+                                                // only 1 card is relevant, can range from 0 all the way to 59
+                                                // inclusive. Each additional relevant card reduces the maximum position
+                                                // by 1.
+                                                'input' => [
+                                                    '$range' => [
+                                                        0, [
+                                                            '$subtract' => [
+                                                                61, [
+                                                                    '$max' => [
+                                                                        '$$numCards', 1
+                                                                    ]
+                                                                ]
+                                                            ]
+                                                        ]
+                                                    ]
+                                                ],
+                                                'as' => 'position',
+                                                'in' => [
+                                                    // Should this game count for this combination of numCards,
+                                                    // mulligans, and position? And if doing estimation, what fractions
+                                                    // should be counted for this position?
+                                                    '$cond' => [
+                                                        // numCards = 0 means doing estimation
+                                                        'if' => [
+                                                            '$eq' => [
+                                                                '$$numCards', 0
+                                                            ]
+                                                        ],
+                                                        'then' => [
+                                                            '$cond' => [
+                                                                // If the game didn't have this many mulligans, don't
+                                                                // count it for anything.
+                                                                'if' => [
+                                                                    '$lte' => [
+                                                                        [
+                                                                            '$size' => '$handsDrawn'
+                                                                        ], '$$mulligans'
+                                                                    ]
+                                                                ],
+                                                                'then' => [
+                                                                    0, 0
+                                                                ],
+                                                                // How many copies of the card at this position were
+                                                                // drawn?
+                                                                'else' => [
+                                                                    '$let' => [
+                                                                        'vars' => [
+                                                                            // Get the hand for this mulligan, and count
+                                                                            // how many cards drawn match what's at this
+                                                                            // position.
+                                                                            'numDrawn' => [
+                                                                                '$size' => [
+                                                                                    '$filter' => [
+                                                                                        'input' => [
+                                                                                            '$arrayElemAt' => [
+                                                                                                '$handsDrawn', '$$mulligans'
+                                                                                            ]
+                                                                                        ],
+                                                                                        'as' => 'card',
+                                                                                        'cond' => [
+                                                                                            '$eq' => [
+                                                                                                '$$card', [
+                                                                                                    '$arrayElemAt' => [
+                                                                                                        '$$deckArray', '$$position'
+                                                                                                    ]
+                                                                                                ]
+                                                                                            ]
+                                                                                        ]
+                                                                                    ]
+                                                                                ]
+                                                                            ]
+                                                                        ],
+                                                                        // Take the number of copies drawn, and use the
+                                                                        // previously calculated weights to spread them
+                                                                        // out among all copies that they could be.
+                                                                        'in' => [
+                                                                            [
+                                                                                '$subtract' => [
+                                                                                    1, [
+                                                                                        '$multiply' => [
+                                                                                            '$$numDrawn', [
+                                                                                                '$arrayElemAt' => [
+                                                                                                    '$$cardEstimationWeights', '$$position'
+                                                                                                ]
+                                                                                            ]
+                                                                                        ]
+                                                                                    ]
+                                                                                ]
+                                                                            ], [
+                                                                                '$multiply' => [
+                                                                                    '$$numDrawn', [
+                                                                                        '$arrayElemAt' => [
+                                                                                            '$$cardEstimationWeights', '$$position'
+                                                                                        ]
+                                                                                    ]
+                                                                                ]
+                                                                            ]
+                                                                        ]
+                                                                    ]
+                                                                ]
+                                                            ]
+                                                        ],
+                                                        // Not doing estimation, need to generate an array with a 1 in
+                                                        // the spot for the number of copies actually drawn.
+                                                        'else' => [
+                                                            '$map' => [
+                                                                // Inner index, number of relevant cards drawn. Can be
+                                                                // up to either the number of relevant cards in the deck
+                                                                // or the size of the hand, whichever is smaller.
+                                                                'input' => [
+                                                                    '$range' => [
+                                                                        0, [
+                                                                            '$min' => [
+                                                                                [
+                                                                                    '$add' => [
+                                                                                        '$$numCards', 1
+                                                                                    ]
+                                                                                ], [
+                                                                                    '$subtract' => [
+                                                                                        8, '$$mulligans'
+                                                                                    ]
+                                                                                ]
+                                                                            ]
+                                                                        ]
+                                                                    ]
+                                                                ],
+                                                                'as' => 'numDrawn',
+                                                                'in' => [
+                                                                    // Should this game count for this combination of
+                                                                    // numCards, mulligans, position, and numDrawn?
+                                                                    '$switch' => [
+                                                                        'branches' => [
+                                                                            // If the game didn't have this many
+                                                                            // mulligans, don't count it for anything.
+                                                                            [
+                                                                                'case' => [
+                                                                                    '$lte' => [
+                                                                                        [
+                                                                                            '$size' => '$handsDrawn'
+                                                                                        ], '$$mulligans'
+                                                                                    ]
+                                                                                ],
+                                                                                'then' => 0
+                                                                            ], [
+                                                                                // If the position/numCards combination
+                                                                                // covers a reliably identifiable set of
+                                                                                // cards, and the numDrawn index
+                                                                                // matches, then count this game here.
+                                                                                'case' => [
+                                                                                    '$and' => [
+                                                                                        // A reliably identifiable set
+                                                                                        // of cards has different cards
+                                                                                        // at and before its start
+                                                                                        // position.
+                                                                                        [
+                                                                                            '$ne' => [
+                                                                                                [
+                                                                                                    '$arrayElemAt' => [
+                                                                                                        '$$deckArray', '$$position'
+                                                                                                    ]
+                                                                                                ], [
+                                                                                                    '$arrayElemAt' => [
+                                                                                                        '$$deckArray', [
+                                                                                                            '$subtract' => [
+                                                                                                                '$$position', 1
+                                                                                                            ]
+                                                                                                        ]
+                                                                                                    ]
+                                                                                                ]
+                                                                                            ]
+                                                                                        ], [
+                                                                                        // A reliably identifiable set
+                                                                                        // of cards has different cards
+                                                                                        // at and after its end
+                                                                                        // position.
+                                                                                            '$ne' => [
+                                                                                                [
+                                                                                                    '$arrayElemAt' => [
+                                                                                                        '$$deckArray', [
+                                                                                                            '$add' => [
+                                                                                                                '$$position', '$$numCards', -1
+                                                                                                            ]
+                                                                                                        ]
+                                                                                                    ]
+                                                                                                ], [
+                                                                                                    '$arrayElemAt' => [
+                                                                                                        '$$deckArray', [
+                                                                                                            '$add' => [
+                                                                                                                '$$position', '$$numCards'
+                                                                                                            ]
+                                                                                                        ]
+                                                                                                    ]
+                                                                                                ]
+                                                                                            ]
+                                                                                        ], [
+                                                                                            // Was the right number of
+                                                                                            // the right cards drawn?
+                                                                                            '$eq' => [
+                                                                                                '$$numDrawn', [
+                                                                                                    // Get the hand for this mulligan, and count how many cards drawn
+                                                                                                    // match the numCards cards at and after this position.
+                                                                                                    '$size' => [
+                                                                                                        '$filter' => [
+                                                                                                            'input' => [
+                                                                                                                '$arrayElemAt' => [
+                                                                                                                    '$handsDrawn', '$$mulligans'
+                                                                                                                ]
+                                                                                                            ],
+                                                                                                            'as' => 'card',
+                                                                                                            'cond' => [
+                                                                                                                '$in' => [
+                                                                                                                    '$$card', [
+                                                                                                                        '$slice' => [
+                                                                                                                            '$$deckArray', '$$position', '$$numCards'
+                                                                                                                        ]
+                                                                                                                    ]
+                                                                                                                ]
+                                                                                                            ]
+                                                                                                        ]
+                                                                                                    ]
+                                                                                                ]
+                                                                                            ]
+                                                                                        ]
+                                                                                    ]
+                                                                                ],
+                                                                                'then' => 1
+                                                                            ]
+                                                                        ],
+                                                                        // This game does not match these index values,
+                                                                        // so don't count it here.
+                                                                        'default' => 0
+                                                                    ]
+                                                                ]
+                                                            ]
                                                         ]
                                                     ]
                                                 ]
@@ -1809,83 +1812,33 @@ $position_pipeline = [
     ], [
         '$group' => [
             '_id' => [
-                'end' => '$stats.end',
-                'numCards' => '$stats.numCards',
-                'update' => '$update'
+                '$cond' => [
+                    'if' => [
+                        '$ne' => [
+                            '$stats.numCards', 0
+                        ]
+                    ],
+                    'then' => [
+                        'numCards' => '$stats.numCards',
+                        'week' => '$week'
+                    ],
+                    'else' => [
+                        'week' => '$week'
+                    ]
+                ]
             ],
             'date' => [
                 '$max' => '$date'
             ],
-            // stats.handCounts from the previous projection is a 1 dimensional array, with each value being the number
-            // of cards from one end of the decklist that were in a hand drawn in the game, in the same order as the
-            // hands were drawn.
-            'handCounts' => [
-                '$push' => '$stats.handCounts'
+            // stats.distribution from the previous projection is a 3 dimensional array, following the output structure
+            // specified above this pipeline.
+            'distributions' => [
+                '$push' => '$stats.distribution'
             ]
         ]
     ], [
-        '$project' => [
-            'date' => 1,
-            // distribution will be a 2 dimensional array, structured as:
-            //      [
-            //          // First index is number of mulligans.
-            //          [
-            //              // Second index is number of cards from the front/back of the decklist in the drawn hand.
-            //              <Number of games that match the indices>
-            //          ]
-            //      ]
-            'distribution' => [
-                '$map' => [
-                    // Size of the hand at each value of the outer index
-                    'input' => [
-                        '$range' => [
-                            7, 0, -1
-                        ]
-                    ],
-                    'as' => 'handSize',
-                    'in' => [
-                        '$map' => [
-                            // Inner index, number of cards from the relevant end of the decklist in the hand. Cover
-                            // every value from 0 lands to the entire hand.
-                            'input' => [
-                                '$range' => [
-                                    0, [
-                                        '$add' => [
-                                            '$$handSize', 1
-                                        ]
-                                    ]
-                                ]
-                            ],
-                            'as' => 'count',
-                            'in' => [
-                                // Count number of games that match the indices.
-                                '$size' => [
-                                    '$filter' => [
-                                        'input' => '$handCounts',
-                                        'as' => 'hand',
-                                        'cond' => [
-                                            '$eq' => [
-                                                [
-                                                    '$arrayElemAt' => [
-                                                        '$$hand', [
-                                                            '$subtract' => [
-                                                                7, '$$handSize'
-                                                            ]
-                                                        ]
-                                                    ]
-                                                ], '$$count'
-                                            ]
-                                        ]
-                                    ]
-                                ]
-                            ]
-                        ]
-                    ]
-                ]
-            ]
-        ]
-    ], [
-        // Need to merge with previously aggregated data.
+        // The process of merging the accumulated distributions and the existing stats is the same, might as well do the
+        // lookup first and combine the merge steps.
         '$lookup' => [
             'from' => 'position_stats',
             'localField' => '_id',
@@ -1895,54 +1848,106 @@ $position_pipeline = [
     ], [
         '$project' => [
             'date' => 1,
+            // distribution will be a 3 dimensional array, merged by summing the inner elements of each input
+            // distribution.
             'distribution' => [
-                '$cond' => [
-                    // If there is no previously aggregated data for this group, then save some time and skip the merge.
-                    [
-                        '$eq' => [
-                            [
-                                '$size' => '$stats'
-                            ], 0
-                        ]
-                    ], '$distribution', [
-                        '$map' => [
-                            // Pair up same-mulligans 1 dimensional inner arrays.
-                            'input' => [
-                                '$zip' => [
-                                    'inputs' => [
-                                        '$distribution', [
-                                            // There can only ever be one matching doc to merge with, so extract it.
-                                            '$arrayElemAt' => [
-                                                '$stats.distribution', 0
+                '$reduce' => [
+                    'input' => '$distributions',
+                    'initialValue' => [
+                        '$cond' => [
+                            'if' => [
+                                '$ne' => [
+                                    [
+                                        '$size' => '$stats.distribution'
+                                    ], 0
+                                ]
+                            ],
+                            'then' => [
+                                '$arrayElemAt' => [
+                                    '$stats.distribution', 0
+                                ]
+                            ],
+                            // If no existing stats available, start with all zeros with the same size structure as
+                            // distributions.
+                            'else' => [
+                                '$map' => [
+                                    'input' => [
+                                        '$arrayElemAt' => [
+                                            '$distributions', 0
+                                        ]
+                                    ],
+                                    'as' => 'middleArray',
+                                    'in' => [
+                                        '$map' => [
+                                            'input' => '$$middleArray',
+                                            'as' => 'innerArray',
+                                            'in' => [
+                                                '$map' => [
+                                                    'input' => '$$innerArray',
+                                                    'as' => 'innerValue',
+                                                    'in' => 0
+                                                ]
                                             ]
                                         ]
                                     ]
                                 ]
+                            ]
+                        ]
+                    ],
+                    'in' => [
+                        '$map' => [
+                            // Pair up same-mulligans 2 dimensional middle arrays.
+                            'input' => [
+                                '$zip' => [
+                                    'inputs' => [
+                                        '$$value', '$$this'
+                                    ]
+                                ]
                             ],
-                            'as' => 'handSizeStats',
+                            'as' => 'mulliganStats',
                             'in' => [
                                 '$map' => [
-                                    // Pair up the actual values that have both indices matching, one value from new
-                                    // data, one from old.
+                                    // Pair up same-position 1 dimensional middle arrays.
                                     'input' => [
                                         '$zip' => [
                                             'inputs' => [
                                                 [
                                                     '$arrayElemAt' => [
-                                                        '$$handSizeStats', 0
+                                                        '$$mulliganStats', 0
                                                     ]
                                                 ], [
                                                     '$arrayElemAt' => [
-                                                        '$$handSizeStats', 1
+                                                        '$$mulliganStats', 1
                                                     ]
                                                 ]
                                             ]
                                         ]
                                     ],
-                                    'as' => 'countStats',
-                                    // Finally, add the paired-up values.
+                                    'as' => 'positionStats',
                                     'in' => [
-                                        '$sum' => '$$countStats'
+                                        '$map' => [
+                                            // Pair up the actual values that have all three indices matching.
+                                            'input' => [
+                                                '$zip' => [
+                                                    'inputs' => [
+                                                        [
+                                                            '$arrayElemAt' => [
+                                                                '$$positionStats', 0
+                                                            ]
+                                                        ], [
+                                                            '$arrayElemAt' => [
+                                                                '$$positionStats', 1
+                                                            ]
+                                                        ]
+                                                    ]
+                                                ]
+                                            ],
+                                            'as' => 'countStats',
+                                            // Finally, add the paired-up values.
+                                            'in' => [
+                                                '$sum' => '$$countStats'
+                                            ]
+                                        ]
                                     ]
                                 ]
                             ]
