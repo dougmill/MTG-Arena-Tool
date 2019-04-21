@@ -31,7 +31,7 @@ if (array_key_exists('deckSize', $query) && array_key_exists('landsInDeck', $que
 
     $cursor = $mongo_lands->aggregate($pipeline, [ 'allowDiskUse' => TRUE ]);
     echo json_encode(iterator_to_array($cursor, false));
-} else if ($query['stats_type'] === 'positions') {
+} else if (array_key_exists('stats_type', $query) && $query['stats_type'] === 'positions') {
     $mongo_positions = (new MongoDB\Client)->tracker->position_stats;
     $pipeline = [[
         '$project' => [
